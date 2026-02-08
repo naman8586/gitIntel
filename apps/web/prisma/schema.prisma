@@ -1,0 +1,90 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Repository {
+  id             String   @id @default(cuid())
+  githubId       BigInt   @unique
+  name           String
+  fullName       String   @unique
+  defaultBranch  String   @default("main")
+  isPrivate      Boolean  @default(false) 
+  stars          Int      @default(0)
+  createdAt      DateTime @default(now())
+  pullRequests   PullRequest[]
+  events         WebhookEvent[]
+  scores         ContributorScore[]
+}
+
+model PullRequest {
+  id           String   @id @default(cuid())
+  githubId       BigInt   @unique
+  number       Int
+  repositoryId String
+  authorId     String
+  title        String
+  state        String
+  mergedAt     DateTime?
+  createdAt    DateTime
+  
+  linesAdded   Int      @default(0)
+  linesDeleted Int      @default(0)
+  isBugFix     Boolean  @default(false)
+  
+  repository   Repository @relation(fields: [repositoryId], references: [id])
+  reviews      Review[]
+  
+  @@unique([repositoryId, number])
+  @@index([authorId])
+}
+
+model Review {
+  id            String   @id @default(cuid())
+  githubId       BigInt   @unique
+  pullRequestId String
+  reviewerId    String
+  state         String
+  submittedAt   DateTime
+  
+  pullRequest   PullRequest @relation(fields: [pullRequestId], references: [id])
+  
+  @@index([reviewerId])
+}
+
+model ContributorScore {
+  id             String   @id @default(cuid())
+  contributorKey String
+  repositoryId   String
+  
+  totalScore     Float    @default(0)
+  totalPRs       Int      @default(0)
+  mergedPRs      Int      @default(0)
+  bugFixPRs      Int      @default(0)
+  reviewsGiven   Int      @default(0)
+  
+  calculatedAt   DateTime @default(now())
+  repository     Repository @relation(fields: [repositoryId], references: [id])
+  
+  @@unique([contributorKey, repositoryId])
+  @@index([totalScore])
+}
+
+model WebhookEvent {
+  id           String    @id @default(cuid())
+  eventId      String    @unique
+  eventType    String
+  repositoryId String?
+  payload      Json
+  processed    Boolean   @default(false)
+  processedAt  DateTime? // THIS IS THE NEW FIELD
+  receivedAt   DateTime  @default(now())
+  
+  repository   Repository? @relation(fields: [repositoryId], references: [id])
+  
+  @@index([processed])
+}
